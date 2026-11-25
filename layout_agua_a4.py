@@ -43,7 +43,9 @@ def crear_layout(nombre_layout="Layout_A4_Mapa_Completo_5mm"):
  
     agregar_guias_layout_bordes(layout)
     layout_a4_mapa_completo(project, layout, mapa)
-
+    leyenda = crear_leyenda(layout, mapa)
+    layout.addLayoutItem(leyenda)
+    
     # Respetando margen inferior de 5 mm en A4 vertical (297 - 5 = 292 mm)
     membrete.agregar_membrete_layout(
         layout=layout,
@@ -93,6 +95,24 @@ def agregar_guias_layout_bordes(layout, margen=5.0, y_divisoria=None):
 
     guide_collection.setVisible(True)
     guide_collection.update()
+
+def crear_leyenda(layout, mapa):
+    # 5. Leyenda superpuesta en esquina inferior izquierda (respetando 5 mm de margen)
+    ancho_leyenda = 95.0
+    alto_leyenda = 55.0
+    posicion_top = 100
+    margen = 10
+    leyenda = QgsLayoutItemLegend(layout)
+    leyenda.setTitle("Leyenda")
+    leyenda.setLinkedMap(mapa)
+    leyenda.setBackgroundEnabled(True)
+    leyenda.setFrameEnabled(True)
+    leyenda.attemptMove(
+        QgsLayoutPoint(margen + 3.0, margen + posicion_top - alto_leyenda - 3.0, QgsUnitTypes.LayoutMillimeters)
+    )
+    leyenda.attemptResize(QgsLayoutSize(ancho_leyenda, alto_leyenda, QgsUnitTypes.LayoutMillimeters))
+    return leyenda
+
 
 
 def layout_a4_mapa_completo(project, layout, mapa, escala=50000):
@@ -177,20 +197,6 @@ def layout_a4_mapa_completo(project, layout, mapa, escala=50000):
     flecha.attemptResize(QgsLayoutSize(15.0, 15.0, QgsUnitTypes.LayoutMillimeters))
     flecha.setLinkedMap(mapa)
     layout.addLayoutItem(flecha)
-
-    # 5. Leyenda superpuesta en esquina inferior izquierda (respetando 5 mm de margen)
-    ancho_leyenda = 95.0
-    alto_leyenda = 55.0
-    leyenda = QgsLayoutItemLegend(layout)
-    leyenda.setTitle("Leyenda")
-    leyenda.setLinkedMap(mapa)
-    leyenda.setBackgroundEnabled(True)
-    leyenda.setFrameEnabled(True)
-    leyenda.attemptMove(
-        QgsLayoutPoint(margen + 3.0, margen + alto_mapa - alto_leyenda - 3.0, QgsUnitTypes.LayoutMillimeters)
-    )
-    leyenda.attemptResize(QgsLayoutSize(ancho_leyenda, alto_leyenda, QgsUnitTypes.LayoutMillimeters))
-    layout.addLayoutItem(leyenda)
 
     # 6. Barra de escala superpuesta en esquina inferior derecha (respetando 5 mm de margen)
     ancho_escala = 58.0

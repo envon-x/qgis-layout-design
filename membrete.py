@@ -9,6 +9,7 @@ from qgis.core import (
     QgsLayoutSize,
     QgsLayoutMeasurement,
     QgsUnitTypes,
+    QgsLayoutGuide,
 )
 
 
@@ -103,6 +104,9 @@ def agregar_membrete_layout(
       - mapa: instancia opcional de QgsLayoutItemMap para tomar la escala actual.
       - titulo, subtitulo, autor, institucion, codigo, fecha, crs_texto: textos del cajetín.
     """
+
+    agregar_guias_layout(layout)
+
     if fecha is None:
         fecha = datetime.now().strftime("%Y-%m-%d")
 
@@ -218,3 +222,64 @@ def agregar_membrete_layout(
             alineacion_v=Qt.AlignTop,
             margen_interno_mm=1.2,
         )
+
+
+
+# Añade los bordes para el diseño del membrete
+def agregar_guias_layout(layout, size="A4", margen=5.0):
+    """Agrega guías verticales y horizontales en milímetros a la página 0."""
+    print("==================================".format())
+
+    # Acceso: page_layout["A4"]["width"] → 210
+    page_layout = {
+        "A0": {"width": 841.0,  "height": 1189.0},  # mm
+        "A1": {"width": 594.0,  "height": 841.0},
+        "A2": {"width": 420.0,  "height": 594.0},
+        "A3": {"width": 297.0,  "height": 420.0},
+        "A4": {"width": 210.0,  "height": 297.0},
+    }
+
+    ROW_NUMBERS = 10 # Numero de filas necesarias para la información en el membrete
+    COL_NUMBERS = 4 # Número de columas necesarias para la inf del membrete
+    height_m = ROW_NUMBERS * margen  # espacio vertical que usará el membrete
+
+    page = layout.pageCollection().page(0)
+    guide_collection = layout.guides()
+
+    # (Solo test) Limpiar guías previas si se desea empezar limpio
+    # guide_collection.clear()
+
+    position_initial_vl = [margen]
+
+    v_size = float(page_layout[size]["width"] - 2 * margen) / float(COL_NUMBERS)
+    print("Ancho columnas: {} mm".format(v_size))
+
+    # Guías verticales (posición X en mm: borde izquierdo y borde derecho)
+    for x in range(1, COL_NUMBERS + 1):
+        position_initial_vl.append(margen + v_size * x)
+
+    for x in position_initial_vl:
+        medida_v = QgsLayoutMeasurement(float(x), Qgis.LayoutUnit.Millimeters)
+        guia_v = QgsLayoutGuide(Qt.Vertical, medida_v, page)
+        guia_v.setPosition(medida_v)
+        guide_collection.addGuide(guia_v)
+
+    # Guías horizontales (posición Y en mm: borde superior, borde inferior y divisoria opcional)
+    posiciones_h = [page_layout[size]["height"] - margen]
+
+    for line in range(2,ROW_NUMBERS + 1):
+        posiciones_h.append(page_layout[size]["height"] - line * margen)
+
+    # Imprime los valores sobre los cuales se dibujaron las lineas horizontantes de referencia para el diseño del memebrete
+    print(", ".join(str(x) for x in posiciones_h))
+
+    for y in posiciones_h:
+        medida_h = QgsLayoutMeasurement(float(y), Qgis.LayoutUnit.Millimeters)
+        guia_h = QgsLayoutGuide(Qt.Horizontal, medida_h, page)
+        guia_h.setPosition(medida_h)
+        guide_collection.addGuide(guia_h)
+
+    guide_collection.setVisible(True)
+    guide_collection.update()
+
+

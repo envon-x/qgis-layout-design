@@ -1,4 +1,6 @@
+import importlib
 import membrete
+importlib.reload(membrete)
 import os
 from qgis.core import (
     QgsProject,
@@ -40,12 +42,15 @@ def crear_layout(nombre_layout="Layout_A4_Mapa_Completo_5mm"):
     layout.setName(nombre_layout)
     mapa = QgsLayoutItemMap(layout)
 
- 
+
     agregar_guias_layout_bordes(layout)
-    layout_a4_mapa_completo(project, layout, mapa)
+    layout_a4_mapa_completo(project, layout, mapa, 20000)
     leyenda = crear_leyenda(layout, mapa)
     layout.addLayoutItem(leyenda)
-    
+
+    escala_bar = crear_escala_bar(layout, mapa)
+    layout.addLayoutItem(escala_bar)
+
     # Respetando margen inferior de 5 mm en A4 vertical (297 - 5 = 292 mm)
     membrete.agregar_membrete_layout(
         layout=layout,
@@ -56,11 +61,12 @@ def crear_layout(nombre_layout="Layout_A4_Mapa_Completo_5mm"):
         alto_mm=48.0,  # 244 + 48 = 292.0 mm -> deja exactamente 5 mm al borde inferior
         titulo="MAPA BASE Y DE REFERENCIA",
         subtitulo="Cartografía base en coordenadas geográficas",
-        autor="Unidad SIG",
+        autor="HECTOR R. BONIFACIO CONDORI",
         institucion="Equipo Técnico",
         codigo="SIG-A4-001",
         crs_texto="WGS 84 (EPSG:4326)",
     )
+
     manager.addLayout(layout)
     iface.openLayoutDesigner(layout)
     print(f"Layout '{nombre_layout}' creado a escala 1:{int(mapa.scale())} (EPSG:4326).")
@@ -113,6 +119,37 @@ def crear_leyenda(layout, mapa):
     leyenda.attemptResize(QgsLayoutSize(ancho_leyenda, alto_leyenda, QgsUnitTypes.LayoutMillimeters))
     return leyenda
 
+def crear_escala_bar(layout, mapa, margen = 20.0):
+    # 6. Barra de escala superpuesta en esquina inferior derecha (respetando 5 mm de margen)
+    ancho_escala = 58.0
+    alto_escala = 16.0
+    posicion_escala = 100
+    escala_bar = QgsLayoutItemScaleBar(layout)
+    escala_bar.setLinkedMap(mapa)
+    escala_bar.setStyle("Single Box")
+    escala_bar.setUnits(QgsUnitTypes.DistanceKilometers)
+
+    # Ajusta unidades por segmento según la escala del mapa (ej. 1 km para ~1:50,000)
+    escala_bar.setNumberOfSegments(2)
+    escala_bar.setNumberOfSegmentsLeft(0)
+    escala_bar.setUnitsPerSegment(1.0)
+
+    # Evita que se desborde fijando rangos de ancho en mm dentro de la caja
+    escala_bar.setMinimumBarWidth(10.0)
+    escala_bar.setMaximumBarWidth(45.0)
+
+    escala_bar.setBackgroundEnabled(True)
+    escala_bar.setFrameEnabled(True)
+    escala_bar.attemptMove(
+        QgsLayoutPoint(
+            margen + posicion_escala - ancho_escala - 3.0,
+            margen + posicion_escala - alto_escala - 3.0,
+            QgsUnitTypes.LayoutMillimeters,
+        )
+    )
+    escala_bar.attemptResize(QgsLayoutSize(ancho_escala, alto_escala, QgsUnitTypes.LayoutMillimeters))
+    escala_bar.update()
+    return escala_bar
 
 
 def layout_a4_mapa_completo(project, layout, mapa, escala=50000):
@@ -140,14 +177,14 @@ def layout_a4_mapa_completo(project, layout, mapa, escala=50000):
     page.setPageSize("A4", QgsLayoutItemPage.Portrait)
 
     # Margen de 5 mm en los 4 lados -> mapa de 200 x 287 mm
-    margen = 5.0
-    ancho_mapa = 210.0 - 2 * margen  # 200.0 mm
-    alto_mapa = 297.0 - 2 * margen   # 287.0 mm
+    MARGEN = 7.0 # (with 2.0 mm of zebra border)
+    ancho_mapa = 210.0 - 2 * MARGEN  # 200.0 mm
+    alto_mapa = 297.0 - 2 * MARGEN   # 287.0 mm
 
     # 2. Mapa a pantalla completa dentro del margen de 5 mm (WGS 84 / EPSG:4326)
     crs_wgs84 = QgsCoordinateReferenceSystem("EPSG:4326")
     mapa.setCrs(crs_wgs84)
-    mapa.attemptMove(QgsLayoutPoint(margen, margen, QgsUnitTypes.LayoutMillimeters))
+    mapa.attemptMove(QgsLayoutPoint(MARGEN, MARGEN, QgsUnitTypes.LayoutMillimeters))
     mapa.attemptResize(QgsLayoutSize(ancho_mapa, 300, QgsUnitTypes.LayoutMillimeters))
     mapa.setFrameEnabled(True)
 
@@ -175,7 +212,7 @@ def layout_a4_mapa_completo(project, layout, mapa, escala=50000):
 
     # Marco Zebra
     grilla.setFrameStyle(QgsLayoutItemMapGrid.Zebra)
-    grilla.setFrameWidth(2.5)
+    grilla.setFrameWidth(2.0)
     grilla.setFramePenSize(0.3)
 
     # Coordenadas en los bordes
@@ -193,41 +230,10 @@ def layout_a4_mapa_completo(project, layout, mapa, escala=50000):
             flecha.setPicturePath(ruta_svg)
             break
 
-    flecha.attemptMove(QgsLayoutPoint(margen + ancho_mapa - 22.0, margen + 5.0, QgsUnitTypes.LayoutMillimeters))
+    flecha.attemptMove(QgsLayoutPoint(MARGEN + ancho_mapa - 22.0, MARGEN + 5.0, QgsUnitTypes.LayoutMillimeters))
     flecha.attemptResize(QgsLayoutSize(15.0, 15.0, QgsUnitTypes.LayoutMillimeters))
     flecha.setLinkedMap(mapa)
     layout.addLayoutItem(flecha)
-
-    # 6. Barra de escala superpuesta en esquina inferior derecha (respetando 5 mm de margen)
-    ancho_escala = 58.0
-    alto_escala = 16.0
-
-    escala_bar = QgsLayoutItemScaleBar(layout)
-    # escala_bar.setLinkedMap(mapa)
-    escala_bar.setStyle("Single Box")
-    escala_bar.setUnits(QgsUnitTypes.DistanceKilometers)
-
-    # Ajusta unidades por segmento según la escala del mapa (ej. 1 km para ~1:50,000)
-    escala_bar.setNumberOfSegments(2)
-    escala_bar.setNumberOfSegmentsLeft(0)
-    escala_bar.setUnitsPerSegment(1.0)
-
-    # Evita que se desborde fijando rangos de ancho en mm dentro de la caja
-    escala_bar.setMinimumBarWidth(10.0)
-    escala_bar.setMaximumBarWidth(45.0)
-
-    escala_bar.setBackgroundEnabled(True)
-    escala_bar.setFrameEnabled(True)
-    escala_bar.attemptMove(
-        QgsLayoutPoint(
-            margen + ancho_mapa - ancho_escala - 3.0,
-            margen + alto_mapa - alto_escala - 3.0,
-            QgsUnitTypes.LayoutMillimeters,
-        )
-    )
-    escala_bar.attemptResize(QgsLayoutSize(ancho_escala, alto_escala, QgsUnitTypes.LayoutMillimeters))
-    escala_bar.update()
-    layout.addLayoutItem(escala_bar)
 
 # Cambia el valor de `escala` según necesites (ej. 10000, 25000, 50000, 100000)
 crear_layout()

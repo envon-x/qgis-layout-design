@@ -57,8 +57,8 @@ def crear_layout(nombre_layout="Layout_A4_Mapa_Completo_5mm"):
         mapa=mapa,
         x_mm=5.0,
         y_mm=244.0,
-        ancho_mm=200.0,
-        alto_mm=48.0,  # 244 + 48 = 292.0 mm -> deja exactamente 5 mm al borde inferior
+        # ancho_mm=200.0,
+        # alto_mm=48.0,  # 244 + 48 = 292.0 mm -> deja exactamente 5 mm al borde inferior
         titulo="MAPA BASE Y DE REFERENCIA",
         subtitulo="Cartografía base en coordenadas geográficas",
         autor="HECTOR R. BONIFACIO CONDORI",

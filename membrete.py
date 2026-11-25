@@ -84,11 +84,9 @@ def agregar_membrete_layout(
     mapa=None,
     x_mm=5.0,
     y_mm=240.0,
-    ancho_mm=200.0,
-    alto_mm=52.0,
     titulo="MAPA TEMÁTICO",
     subtitulo="Distribución espacial y referencia cartográfica",
-    autor="",
+    autor="Hector R. Bonifacio",
     institucion="",
     codigo="",
     fecha=None,
@@ -105,14 +103,27 @@ def agregar_membrete_layout(
       - titulo, subtitulo, autor, institucion, codigo, fecha, crs_texto: textos del cajetín.
     """
 
-    agregar_guias_layout(layout)
+
+    line_aux = agregar_guias_layout(layout)
 
     if fecha is None:
-        fecha = datetime.now().strftime("%Y-%m-%d")
+        fecha = datetime.now().strftime("%d%m/%Y")
 
     escala_str = ""
     if incluir_escala and mapa is not None and mapa.scale() > 0:
         escala_str = f"1:{int(round(mapa.scale())):,}".replace(",", " ")
+
+    x0 = line_aux["x"][0]
+    xn = line_aux["x"][-1]
+    y0 = line_aux["y"][-1]
+    yn = line_aux["y"][0]
+
+    print("{}".format(line_aux))
+    
+    print("({}, {}) ({}, {})".format(x0,y0, xn, yn))
+    
+    ancho_mm = xn - x0
+    alto_mm = yn - y0
 
     # Contenedor exterior del membrete
     _crear_rectangulo_borde(layout, x_mm, y_mm, ancho_mm, alto_mm, grosor_borde_mm)
@@ -225,7 +236,9 @@ def agregar_membrete_layout(
 
 
 
-# Añade los bordes para el diseño del membrete
+
+# Añade las bordes lineas auxiliares para el diseño del membrete
+# returna puntos, en valores numéricos en mm de las lineas auxiliares
 def agregar_guias_layout(layout, size="A4", margen=5.0):
     """Agrega guías verticales y horizontales en milímetros a la página 0."""
 
@@ -248,31 +261,31 @@ def agregar_guias_layout(layout, size="A4", margen=5.0):
     # (Solo test) Limpiar guías previas si se desea empezar limpio
     # guide_collection.clear()
 
-    position_initial_vl = [margen]
+    position_vl = [margen]
 
     v_size = float(page_layout[size]["width"] - 2 * margen) / float(COL_NUMBERS)
     print("Ancho columnas: {} mm".format(v_size))
 
     # Guías verticales (posición X en mm: borde izquierdo y borde derecho)
     for x in range(1, COL_NUMBERS + 1):
-        position_initial_vl.append(margen + v_size * x)
+        position_vl.append(margen + v_size * x)
 
-    for x in position_initial_vl:
+    for x in position_vl:
         medida_v = QgsLayoutMeasurement(float(x), Qgis.LayoutUnit.Millimeters)
         guia_v = QgsLayoutGuide(Qt.Vertical, medida_v, page)
         guia_v.setPosition(medida_v)
         guide_collection.addGuide(guia_v)
 
     # Guías horizontales (posición Y en mm: borde superior, borde inferior y divisoria opcional)
-    posiciones_h = [page_layout[size]["height"] - margen]
+    position_hl = [page_layout[size]["height"] - margen]
 
     for line in range(2,ROW_NUMBERS + 1):
-        posiciones_h.append(page_layout[size]["height"] - line * margen)
+        position_hl.append(page_layout[size]["height"] - line * margen)
 
     # Imprime los valores sobre los cuales se dibujaron las lineas horizontantes de referencia para el diseño del memebrete
-    print(", ".join(str(x) for x in posiciones_h))
+    print(", ".join(str(x) for x in position_hl))
 
-    for y in posiciones_h:
+    for y in position_hl:
         medida_h = QgsLayoutMeasurement(float(y), Qgis.LayoutUnit.Millimeters)
         guia_h = QgsLayoutGuide(Qt.Horizontal, medida_h, page)
         guia_h.setPosition(medida_h)
@@ -281,4 +294,8 @@ def agregar_guias_layout(layout, size="A4", margen=5.0):
     guide_collection.setVisible(True)
     guide_collection.update()
 
-
+    lines_auxiliar = {
+            "x": position_vl, # x tickness 
+            "y": position_hl, # y tickness
+            }
+    return lines_auxiliar

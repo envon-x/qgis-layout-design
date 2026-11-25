@@ -1,3 +1,4 @@
+import membrete
 import os
 from qgis.core import (
     QgsProject,
@@ -37,10 +38,27 @@ def crear_layout(nombre_layout="Layout_A4_Mapa_Completo_5mm"):
     layout = QgsPrintLayout(project)
     layout.initializeDefaults()
     layout.setName(nombre_layout)
+    mapa = QgsLayoutItemMap(layout)
 
+ 
     agregar_guias_layout_bordes(layout)
-    layout_a4_mapa_completo(project, layout)
+    layout_a4_mapa_completo(project, layout, mapa)
 
+    # Respetando margen inferior de 5 mm en A4 vertical (297 - 5 = 292 mm)
+    membrete.agregar_membrete_layout(
+        layout=layout,
+        mapa=mapa,
+        x_mm=5.0,
+        y_mm=244.0,
+        ancho_mm=200.0,
+        alto_mm=48.0,  # 244 + 48 = 292.0 mm -> deja exactamente 5 mm al borde inferior
+        titulo="MAPA BASE Y DE REFERENCIA",
+        subtitulo="Cartografía base en coordenadas geográficas",
+        autor="Unidad SIG",
+        institucion="Equipo Técnico",
+        codigo="SIG-A4-001",
+        crs_texto="WGS 84 (EPSG:4326)",
+    )
     manager.addLayout(layout)
     iface.openLayoutDesigner(layout)
     print(f"Layout '{nombre_layout}' creado a escala 1:{int(mapa.scale())} (EPSG:4326).")
@@ -77,7 +95,27 @@ def agregar_guias_layout_bordes(layout, margen=5.0, y_divisoria=None):
     guide_collection.update()
 
 
-def layout_a4_mapa_completo(project, layout, escala=50000):
+def layout_a4_mapa_completo(project, layout, mapa, escala=50000):
+    """
+    Configura una página en formato A4 vertical para un diseño de impresión en QGIS.
+
+    Establece el tamaño de la primera página del layout en A4 (210 × 297 mm) y
+    orientación vertical (`QgsLayoutItemPage.Portrait`) como base para ubicar
+    el mapa, la escala, la grilla y demás elementos cartográficos.
+
+    Args:
+        project (QgsProject): Instancia del proyecto activo de QGIS donde reside
+            el diseño y las capas asociadas.
+        layout (QgsPrintLayout): Diseño de impresión (`QgsPrintLayout`) al que
+            pertenece la página a configurar.
+        mapa (QgsLayoutItemMap): Ítem de mapa del diseño que se asociará o
+            ajustará a la extensión y escala del layout.
+        escala (int | float, optional): Denominador de escala cartográfica
+            deseado (por ejemplo, `50000` para `1:50,000`). Por defecto es `50000`.
+
+    Returns:
+        QgsLayoutItemPage: La página configurada (`page(0)`) del layout.
+    """
     page = layout.pageCollection().page(0)
     page.setPageSize("A4", QgsLayoutItemPage.Portrait)
 
@@ -88,7 +126,6 @@ def layout_a4_mapa_completo(project, layout, escala=50000):
 
     # 2. Mapa a pantalla completa dentro del margen de 5 mm (WGS 84 / EPSG:4326)
     crs_wgs84 = QgsCoordinateReferenceSystem("EPSG:4326")
-    mapa = QgsLayoutItemMap(layout)
     mapa.setCrs(crs_wgs84)
     mapa.attemptMove(QgsLayoutPoint(margen, margen, QgsUnitTypes.LayoutMillimeters))
     mapa.attemptResize(QgsLayoutSize(ancho_mapa, 300, QgsUnitTypes.LayoutMillimeters))

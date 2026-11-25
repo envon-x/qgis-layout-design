@@ -14,11 +14,18 @@ from qgis.core import (
     QgsCoordinateReferenceSystem,
     QgsCoordinateTransform,
     QgsApplication,
+    QgsScaleBarSettings,
+    QgsLayoutMeasurement,
 )
 from qgis.utils import iface
+from qgis.PyQt.QtCore import Qt
+from qgis.core import (
+    QgsLayoutGuide,
+    QgsLayoutPoint,
+    QgsUnitTypes,
+)
 
-
-def crear_layout_a4_mapa_completo(nombre_layout="Layout_A4_Mapa_Completo_5mm"):
+def crear_layout(nombre_layout="Layout_A4_Mapa_Completo_5mm"):
     project = QgsProject.instance()
     manager = project.layoutManager()
 
@@ -31,6 +38,46 @@ def crear_layout_a4_mapa_completo(nombre_layout="Layout_A4_Mapa_Completo_5mm"):
     layout.initializeDefaults()
     layout.setName(nombre_layout)
 
+    agregar_guias_layout_bordes(layout)
+    layout_a4_mapa_completo(project, layout)
+
+    manager.addLayout(layout)
+    iface.openLayoutDesigner(layout)
+    print(f"Layout '{nombre_layout}' creado a escala 1:{int(mapa.scale())} (EPSG:4326).")
+    return layout
+
+# Añade los bordes para ajustar el mapa
+def agregar_guias_layout_bordes(layout, margen=5.0, y_divisoria=None):
+    """Agrega guías verticales y horizontales en milímetros a la página 0."""
+    page = layout.pageCollection().page(0)
+    guide_collection = layout.guides()
+
+    # Limpiar guías previas si se desea empezar limpio
+    guide_collection.clear()
+
+    # Guías verticales (posición X en mm: borde izquierdo y borde derecho)
+    for x in [margen, 210.0 - margen]:
+        medida_v = QgsLayoutMeasurement(float(x), Qgis.LayoutUnit.Millimeters)
+        guia_v = QgsLayoutGuide(Qt.Vertical, medida_v, page)
+        guia_v.setPosition(medida_v)
+        guide_collection.addGuide(guia_v)
+
+    # Guías horizontales (posición Y en mm: borde superior, borde inferior y divisoria opcional)
+    posiciones_y = [margen, 297.0 - margen]
+    if y_divisoria is not None:
+        posiciones_y.append(float(y_divisoria))
+
+    for y in posiciones_y:
+        medida_h = QgsLayoutMeasurement(float(y), Qgis.LayoutUnit.Millimeters)
+        guia_h = QgsLayoutGuide(Qt.Horizontal, medida_h, page)
+        guia_h.setPosition(medida_h)
+        guide_collection.addGuide(guia_h)
+
+    guide_collection.setVisible(True)
+    guide_collection.update()
+
+
+def layout_a4_mapa_completo(project, layout, escala=50000):
     page = layout.pageCollection().page(0)
     page.setPageSize("A4", QgsLayoutItemPage.Portrait)
 
@@ -44,7 +91,7 @@ def crear_layout_a4_mapa_completo(nombre_layout="Layout_A4_Mapa_Completo_5mm"):
     mapa = QgsLayoutItemMap(layout)
     mapa.setCrs(crs_wgs84)
     mapa.attemptMove(QgsLayoutPoint(margen, margen, QgsUnitTypes.LayoutMillimeters))
-    mapa.attemptResize(QgsLayoutSize(ancho_mapa, alto_mapa, QgsUnitTypes.LayoutMillimeters))
+    mapa.attemptResize(QgsLayoutSize(ancho_mapa, 300, QgsUnitTypes.LayoutMillimeters))
     mapa.setFrameEnabled(True)
 
     canvas_extent = iface.mapCanvas().extent()
@@ -52,6 +99,10 @@ def crear_layout_a4_mapa_completo(nombre_layout="Layout_A4_Mapa_Completo_5mm"):
     if not canvas_extent.isEmpty():
         transform = QgsCoordinateTransform(canvas_crs, crs_wgs84, project)
         mapa.setExtent(transform.transformBoundingBox(canvas_extent))
+
+    # Establecer escala numérica (ej. 50000 = 1:50,000)
+    if escala is not None and escala > 0:
+        mapa.setScale(float(escala))
 
     layout.addLayoutItem(mapa)
 
@@ -105,31 +156,35 @@ def crear_layout_a4_mapa_completo(nombre_layout="Layout_A4_Mapa_Completo_5mm"):
     layout.addLayoutItem(leyenda)
 
     # 6. Barra de escala superpuesta en esquina inferior derecha (respetando 5 mm de margen)
-    ancho_escala = 65.0
-    alto_escala = 18.0
-    escala = QgsLayoutItemScaleBar(layout)
-    escala.setLinkedMap(mapa)
-    escala.setStyle("Single Box")
-    escala.setUnits(QgsUnitTypes.DistanceKilometers)
-    escala.setNumberOfSegments(2)
-    escala.setNumberOfSegmentsLeft(0)
-    escala.setUnitsPerSegment(10)
-    escala.setBackgroundEnabled(True)
-    escala.setFrameEnabled(True)
-    escala.attemptMove(
+    ancho_escala = 58.0
+    alto_escala = 16.0
+
+    escala_bar = QgsLayoutItemScaleBar(layout)
+    # escala_bar.setLinkedMap(mapa)
+    escala_bar.setStyle("Single Box")
+    escala_bar.setUnits(QgsUnitTypes.DistanceKilometers)
+
+    # Ajusta unidades por segmento según la escala del mapa (ej. 1 km para ~1:50,000)
+    escala_bar.setNumberOfSegments(2)
+    escala_bar.setNumberOfSegmentsLeft(0)
+    escala_bar.setUnitsPerSegment(1.0)
+
+    # Evita que se desborde fijando rangos de ancho en mm dentro de la caja
+    escala_bar.setMinimumBarWidth(10.0)
+    escala_bar.setMaximumBarWidth(45.0)
+
+    escala_bar.setBackgroundEnabled(True)
+    escala_bar.setFrameEnabled(True)
+    escala_bar.attemptMove(
         QgsLayoutPoint(
             margen + ancho_mapa - ancho_escala - 3.0,
             margen + alto_mapa - alto_escala - 3.0,
             QgsUnitTypes.LayoutMillimeters,
         )
     )
-    escala.attemptResize(QgsLayoutSize(ancho_escala, alto_escala, QgsUnitTypes.LayoutMillimeters))
-    layout.addLayoutItem(escala)
+    escala_bar.attemptResize(QgsLayoutSize(ancho_escala, alto_escala, QgsUnitTypes.LayoutMillimeters))
+    escala_bar.update()
+    layout.addLayoutItem(escala_bar)
 
-    manager.addLayout(layout)
-    iface.openLayoutDesigner(layout)
-    print(f"Layout '{nombre_layout}' creado: mapa 200x287 mm con 5 mm de margen en los 4 lados.")
-    return layout
-
-
-crear_layout_a4_mapa_completo()
+# Cambia el valor de `escala` según necesites (ej. 10000, 25000, 50000, 100000)
+crear_layout()

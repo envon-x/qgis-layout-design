@@ -228,7 +228,6 @@ def agregar_membrete_layout(
 # Añade los bordes para el diseño del membrete
 def agregar_guias_layout(layout, size="A4", margen=5.0):
     """Agrega guías verticales y horizontales en milímetros a la página 0."""
-    print("==================================".format())
 
     # Acceso: page_layout["A4"]["width"] → 210
     page_layout = {

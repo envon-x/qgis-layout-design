@@ -1,3 +1,4 @@
+import constants
 from datetime import datetime
 from qgis.PyQt.QtCore import Qt
 from qgis.PyQt.QtGui import QFont
@@ -11,6 +12,11 @@ from qgis.core import (
     QgsUnitTypes,
     QgsLayoutGuide,
 )
+
+from constants import MARGIN
+
+# from constants import ROW_NUMBERS
+# from constants import COL_NUMBERS
 
 
 def _mm(valor):
@@ -83,7 +89,7 @@ def agregar_membrete_layout(
     layout,
     mapa=None,
     x_mm=5.0,
-    y_mm=240.0,
+    alto_map=240.0,
     titulo="MAPA TEMÁTICO",
     subtitulo="Distribución espacial y referencia cartográfica",
     autor="Hector R. Bonifacio",
@@ -119,35 +125,55 @@ def agregar_membrete_layout(
     yn = line_aux["y"][0]
 
     print("{}".format(line_aux))
-    
+
     print("({}, {}) ({}, {})".format(x0,y0, xn, yn))
-    
-    ancho_mm = xn - x0
-    alto_mm = yn - y0
+
+    # No modificar, propiedades del membrete
+    ancho_mem = constants.page_layout["A4"]["width"] - 2 * constants.MARGIN # xn - x0
+    alto_mem = constants.ROW_NUMBERS * constants.MARGIN
+
+    print("alto: {}".format(alto_mem))
+
+    alto_map = constants.page_layout["A4"]["height"] - alto_mem - constants.MARGIN
 
     # Contenedor exterior del membrete
-    _crear_rectangulo_borde(layout, x_mm, y_mm, ancho_mm, alto_mm, grosor_borde_mm)
+    _crear_rectangulo_borde(
+        layout,
+        x_mm,       # Dezplazamiento de la base hacia la derecha
+        alto_map,
+        ancho_mem,
+        alto_mem,
+        grosor_borde_mm
+    )
 
     # División horizontal: fila superior (título/subtítulo) y fila inferior (metadatos)
-    alto_superior = alto_mm * 0.45
-    alto_inferior = alto_mm - alto_superior
-    y_fila_inferior = y_mm + alto_superior
+    alto_superior = alto_mem * 0.45
+    alto_inferior = alto_mem - alto_superior
+    y_fila_inferior = alto_map + alto_superior
+
+    print("alto_mm: {}".format(alto_mem))
+    print("alto superior: {}".format(alto_superior))
+    print("alto inferior: {}".format(alto_inferior))
+    print("x_mm: {}".format(x_mm))
+    print("y_mm: {}".format(alto_map))
+    print("ancho: {}".format(ancho_mem))
+    print("y fila inferior: {}".format(y_fila_inferior))
 
     # Línea horizontal divisoria principal
-    _crear_rectangulo_borde(layout, x_mm, y_fila_inferior, ancho_mm, 0.01, grosor_borde_mm)
+    _crear_rectangulo_borde(layout, x_mm, y_fila_inferior, ancho_mem, 0.01, grosor_borde_mm)
 
     # Fila superior: Título a la izquierda, Código/Institución a la derecha
-    ancho_col_der = ancho_mm * 0.28
-    ancho_col_izq = ancho_mm - ancho_col_der
+    ancho_col_der = ancho_mem * 0.28
+    ancho_col_izq = ancho_mem - ancho_col_der
     x_col_der = x_mm + ancho_col_izq
 
-    _crear_rectangulo_borde(layout, x_col_der, y_mm, 0.01, alto_superior, grosor_borde_mm)
+    _crear_rectangulo_borde(layout, x_col_der, alto_map, 0.01, alto_superior, grosor_borde_mm)
 
     _crear_etiqueta(
         layout,
         titulo,
         x_mm,
-        y_mm,
+        alto_map,
         ancho_col_izq,
         alto_superior * 0.58,
         tam_fuente=10.5,
@@ -159,7 +185,7 @@ def agregar_membrete_layout(
         layout,
         subtitulo,
         x_mm,
-        y_mm + alto_superior * 0.55,
+        alto_map + alto_superior * 0.55,
         ancho_col_izq,
         alto_superior * 0.45,
         tam_fuente=7.5,
@@ -173,7 +199,7 @@ def agregar_membrete_layout(
         layout,
         texto_der_sup,
         x_col_der,
-        y_mm,
+        alto_map,
         ancho_col_der,
         alto_superior,
         tam_fuente=8.0,
@@ -200,7 +226,7 @@ def agregar_membrete_layout(
         celdas_inferiores.append(("Referencia:", crs_texto or "WGS 84"))
 
     num_celdas = len(celdas_inferiores)
-    ancho_celda = ancho_mm / num_celdas
+    ancho_celda = ancho_mem / num_celdas
 
     for idx, (etq, val) in enumerate(celdas_inferiores):
         cx = x_mm + idx * ancho_celda
@@ -239,36 +265,27 @@ def agregar_membrete_layout(
 
 # Añade las bordes lineas auxiliares para el diseño del membrete
 # returna puntos, en valores numéricos en mm de las lineas auxiliares
-def agregar_guias_layout(layout, size="A4", margen=5.0):
+def agregar_guias_layout(layout, size="A4"):
     """Agrega guías verticales y horizontales en milímetros a la página 0."""
 
-    # Acceso: page_layout["A4"]["width"] → 210
-    page_layout = {
-        "A0": {"width": 841.0,  "height": 1189.0},  # mm
-        "A1": {"width": 594.0,  "height": 841.0},
-        "A2": {"width": 420.0,  "height": 594.0},
-        "A3": {"width": 297.0,  "height": 420.0},
-        "A4": {"width": 210.0,  "height": 297.0},
-    }
-
-    ROW_NUMBERS = 10 # Numero de filas necesarias para la información en el membrete
-    COL_NUMBERS = 4 # Número de columas necesarias para la inf del membrete
-    height_m = ROW_NUMBERS * margen  # espacio vertical que usará el membrete
-
+    page_layout = constants.page_layout
+    row_numbers = constants.ROW_NUMBERS # Numero de filas
+    col_numbers = constants.COL_NUMBERS # Número de columas
+    height_m = row_numbers * MARGIN  # espacio vertical que usará el membrete
     page = layout.pageCollection().page(0)
     guide_collection = layout.guides()
 
     # (Solo test) Limpiar guías previas si se desea empezar limpio
-    # guide_collection.clear()
+    guide_collection.clear()
 
-    position_vl = [margen]
+    position_vl = [MARGIN]
 
-    v_size = float(page_layout[size]["width"] - 2 * margen) / float(COL_NUMBERS)
+    v_size = float(page_layout[size]["width"] - 2 * MARGIN) / float(col_numbers)
     print("Ancho columnas: {} mm".format(v_size))
 
     # Guías verticales (posición X en mm: borde izquierdo y borde derecho)
-    for x in range(1, COL_NUMBERS + 1):
-        position_vl.append(margen + v_size * x)
+    for x in range(1, col_numbers + 1):
+        position_vl.append(MARGIN + v_size * x)
 
     for x in position_vl:
         medida_v = QgsLayoutMeasurement(float(x), Qgis.LayoutUnit.Millimeters)
@@ -277,10 +294,10 @@ def agregar_guias_layout(layout, size="A4", margen=5.0):
         guide_collection.addGuide(guia_v)
 
     # Guías horizontales (posición Y en mm: borde superior, borde inferior y divisoria opcional)
-    position_hl = [page_layout[size]["height"] - margen]
+    position_hl = [page_layout[size]["height"] - MARGIN]
 
-    for line in range(2,ROW_NUMBERS + 1):
-        position_hl.append(page_layout[size]["height"] - line * margen)
+    for line in range(1,row_numbers + 1):
+        position_hl.append(page_layout[size]["height"] - line * MARGIN)
 
     # Imprime los valores sobre los cuales se dibujaron las lineas horizontantes de referencia para el diseño del memebrete
     print(", ".join(str(x) for x in position_hl))
@@ -295,7 +312,7 @@ def agregar_guias_layout(layout, size="A4", margen=5.0):
     guide_collection.update()
 
     lines_auxiliar = {
-            "x": position_vl, # x tickness 
+            "x": position_vl, # x tickness
             "y": position_hl, # y tickness
             }
     return lines_auxiliar

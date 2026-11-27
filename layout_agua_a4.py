@@ -1,6 +1,9 @@
 import importlib
+from constants import MARGIN
 import membrete
+import constants
 importlib.reload(membrete)
+importlib.reload(constants)
 import os
 from qgis.core import (
     QgsProject,
@@ -56,9 +59,6 @@ def crear_layout(nombre_layout="Layout_A4_Mapa_Completo_5mm"):
         layout=layout,
         mapa=mapa,
         x_mm=5.0,
-        y_mm=244.0,
-        # ancho_mm=200.0,
-        # alto_mm=48.0,  # 244 + 48 = 292.0 mm -> deja exactamente 5 mm al borde inferior
         titulo="MAPA BASE Y DE REFERENCIA",
         subtitulo="Cartografía base en coordenadas geográficas",
         autor="HECTOR R. BONIFACIO CONDORI",
@@ -73,7 +73,7 @@ def crear_layout(nombre_layout="Layout_A4_Mapa_Completo_5mm"):
     return layout
 
 # Añade los bordes para ajustar el mapa
-def agregar_guias_layout_bordes(layout, margen=5.0, y_divisoria=None):
+def agregar_guias_layout_bordes(layout, y_divisoria=None):
     """Agrega guías verticales y horizontales en milímetros a la página 0."""
     page = layout.pageCollection().page(0)
     guide_collection = layout.guides()
@@ -82,14 +82,14 @@ def agregar_guias_layout_bordes(layout, margen=5.0, y_divisoria=None):
     guide_collection.clear()
 
     # Guías verticales (posición X en mm: borde izquierdo y borde derecho)
-    for x in [margen, 210.0 - margen]:
+    for x in [MARGIN, 210.0 - MARGIN]:
         medida_v = QgsLayoutMeasurement(float(x), Qgis.LayoutUnit.Millimeters)
         guia_v = QgsLayoutGuide(Qt.Vertical, medida_v, page)
         guia_v.setPosition(medida_v)
         guide_collection.addGuide(guia_v)
 
     # Guías horizontales (posición Y en mm: borde superior, borde inferior y divisoria opcional)
-    posiciones_y = [margen, 297.0 - margen]
+    posiciones_y = [MARGIN, 297.0 - MARGIN]
     if y_divisoria is not None:
         posiciones_y.append(float(y_divisoria))
 
